@@ -40,7 +40,7 @@ struct AddTodoView: View {
 #Preview {
     var container = try? ModelContainer()
     var context = container!.mainContext
-    var viewModel = TodoListViewModel(with: SwiftDataLocalSource(container: container, context: context))
+    var viewModel = TodoListViewModel(with: SwiftDataSource(container: container, context: context))
     NavigationStack {
         AddTodoView(viewModel: viewModel)
     }

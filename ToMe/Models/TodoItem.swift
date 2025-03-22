@@ -21,7 +21,7 @@ class TodoItem {
         id: UUID = .init(),
         title: String,
         todoDescription: String,
-        creationDate: Date = Date(),
+        creationDate: Date = .now,
         isCompleted: Bool = false
     ) {
         self.id = id

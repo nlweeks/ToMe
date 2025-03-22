@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @MainActor
-class SwiftDataLocalSource {
+class SwiftDataSource {
     private var container: ModelContainer?
     private var context: ModelContext?
     
@@ -19,8 +19,8 @@ class SwiftDataLocalSource {
     }
 }
 
-// MARK: Adding, deleting, fetching
-extension SwiftDataLocalSource {
+// MARK: Adding, deleting, fetching, sort fetching
+extension SwiftDataSource {
     func insert(_ entity: TodoItem) {
         self.container?.mainContext.insert(entity)
         try? self.container?.mainContext.save()
@@ -31,8 +31,8 @@ extension SwiftDataLocalSource {
         try? self.container?.mainContext.save()
     }
     
-    func fetch() -> [TodoItem] {
-        let fetchDescriptor = FetchDescriptor<TodoItem>(sortBy: [SortDescriptor(\TodoItem.orderIndex)])
+    func fetchTodos(sortedBy method: SortMethod = .storedOrder) -> [TodoItem] {
+        let fetchDescriptor = FetchDescriptor<TodoItem>(sortBy: [method.sortDescriptor])
         let todos = try? self.container?.mainContext.fetch(fetchDescriptor)
         return todos ?? []
     }

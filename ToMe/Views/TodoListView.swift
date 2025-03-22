@@ -10,7 +10,7 @@ import SwiftData
 
 struct TodoListView: View {
     @State var viewModel = TodoListViewModel(
-        with: SwiftDataLocalSource(
+        with: SwiftDataSource(
             container: SwiftDataContextManager.shared.container,
             context: SwiftDataContextManager.shared.context)
     )
@@ -33,18 +33,7 @@ struct TodoListView: View {
                         
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Menu(content:{
-                            Menu(content: {
-                                Button("Title") {
-                                    // TODO: Make sorting by title function
-                                }
-                            }, label: {
-                                Label("Sort", systemImage: "arrow.up.arrow.down")
-                            })
-                        }, label: {
-                            Label("Options", systemImage: "ellipsis.circle")
-                        })
-                        .menuStyle(.button)
+                        TodoListMenu(viewModel: viewModel)
                     }
                     
                     ToolbarItem(placement: .bottomBar) {
@@ -93,6 +82,28 @@ struct TodoListView: View {
             }
         }
     }
+    
+    private struct TodoListMenu: View {
+        @Bindable var viewModel: TodoListViewModel
+        
+        var body: some View {
+            Menu(content:{
+                Menu(content: {
+                    Button("Title") {
+                        viewModel.fetchTodos(sortedBy: .title)
+                    }
+                    Button("Created") {
+                        viewModel.fetchTodos(sortedBy: .title)
+                    }
+                }, label: {
+                    Label("Sort", systemImage: "arrow.up.arrow.down")
+                })
+            }, label: {
+                Label("Options", systemImage: "ellipsis.circle")
+            })
+            .menuStyle(.button)
+        }
+    }
 }
 
 
@@ -101,5 +112,5 @@ struct TodoListView: View {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: TodoItem.self, configurations: config)
     
-    TodoListView(viewModel: TodoListViewModel(with: SwiftDataLocalSource(container: container, context: ModelContext(container))))
+    TodoListView(viewModel: TodoListViewModel(with: SwiftDataSource(container: container, context: ModelContext(container))))
 }

@@ -11,17 +11,17 @@ import SwiftUI
 @Observable
 class TodoListViewModel {
     // MARK: Data Source
-    private let dataSource: SwiftDataLocalSource
+    private let dataSource: SwiftDataSource
     
     // MARK: Todos Loaded To Memory
     var todos: [TodoItem] = []
     
     // MARK: Init
-    init(with dataSource: SwiftDataLocalSource) {
+    init(with dataSource: SwiftDataSource) {
         self.dataSource = dataSource
         
         Task { @MainActor in
-            todos = dataSource.fetch()
+            todos = dataSource.fetchTodos()
         }
     }
     
@@ -73,11 +73,18 @@ class TodoListViewModel {
         
     }
     
+    func fetchTodos(sortedBy method: SortMethod = .storedOrder) {
+        Task { @MainActor in
+            todos = dataSource.fetchTodos(sortedBy: method)
+        }
+        updateIndices()
+    }
+    
     // MARK: Data source interfacing
     func insertTodo(_ todo: TodoItem) {
         Task { @MainActor in
             dataSource.insert(todo)
-            todos = dataSource.fetch()
+            todos = dataSource.fetchTodos()
         }
         updateIndices()
     }
@@ -88,7 +95,7 @@ class TodoListViewModel {
                 let todo = todos[index]
                 dataSource.delete(todo)
             }
-            todos = dataSource.fetch()
+            todos = dataSource.fetchTodos()
         }
         updateIndices()
     }
