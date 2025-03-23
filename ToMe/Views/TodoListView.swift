@@ -15,20 +15,28 @@ struct TodoListView: View {
             context: SwiftDataContextManager.shared.context)
     )
     
+    @State private var editMode: EditMode = .inactive
+    @State var selectedRows = Set<TodoItem>()
+    
     var body: some View {
+        
         NavigationStack {
-            Group {
-                List {
-                    ForEach(viewModel.todos) { todo in
+                List(selection: $selectedRows) {
+                    ForEach(viewModel.searchResults) { todo in
                         Text(todo.title)
                     }
                     .onDelete(perform: viewModel.deleteTodos(at:))
                     .onMove(perform: viewModel.moveTodo(from:to:))
                 }
                 .navigationBarTitle("To-Do List")
+                .environment(\.editMode, $editMode)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        EditButton()
+                        Button(editMode.isEditing ? "Done" : "Edit") {
+                            withAnimation {
+                                editMode = editMode == .active ? .inactive : .active
+                            }
+                        }
                             .opacity(viewModel.todos.isEmpty ? 0 : 1)
                         
                     }
@@ -55,9 +63,14 @@ struct TodoListView: View {
                 .sheet(isPresented: $viewModel.isAddingTodo) {
                     AddTodoView(viewModel: viewModel)
                         .interactiveDismissDisabled()
+                        .presentationDetents([.medium])
                 }
-            }
+                .onAppear {
+                    viewModel.preloadSampleData()
+                }
+                .searchable(text: $viewModel.searchQuery, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search")
         }
+        
     }
     
     private struct EmptyListView: View {
@@ -111,6 +124,10 @@ struct TodoListView: View {
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: TodoItem.self, configurations: config)
+    let viewModel = TodoListViewModel(with: SwiftDataSource(container: container, context: ModelContext(container)))
     
-    TodoListView(viewModel: TodoListViewModel(with: SwiftDataSource(container: container, context: ModelContext(container))))
+    TodoListView(viewModel: viewModel)
+        .onAppear {
+            viewModel.preloadSampleData()
+        }
 }

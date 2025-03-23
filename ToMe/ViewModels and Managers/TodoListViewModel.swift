@@ -73,6 +73,19 @@ class TodoListViewModel {
         
     }
     
+    // MARK: Searching
+    var searchQuery: String = ""
+    var searchResults: [TodoItem] {
+        if searchQuery.isEmpty {
+            return todos
+        } else {
+            return todos.filter {
+                $0.title.lowercased().contains(searchQuery.lowercased())
+            }
+        }
+    }
+    
+    // MARK: Data source interfacing
     func fetchTodos(sortedBy method: SortMethod = .storedOrder) {
         Task { @MainActor in
             todos = dataSource.fetchTodos(sortedBy: method)
@@ -80,7 +93,6 @@ class TodoListViewModel {
         updateIndices()
     }
     
-    // MARK: Data source interfacing
     func insertTodo(_ todo: TodoItem) {
         Task { @MainActor in
             dataSource.insert(todo)
@@ -98,6 +110,20 @@ class TodoListViewModel {
             todos = dataSource.fetchTodos()
         }
         updateIndices()
+    }
+    
+    // MARK: Testing functions
+    func preloadSampleData() {
+        let sampleTodos = TodoItem.samplesWithOrderIndices()
+        
+        // Add to your data source
+        Task { @MainActor in
+            for todo in sampleTodos {
+                dataSource.insert(todo)
+            }
+        }
+        
+        fetchTodos()
     }
 }
 
