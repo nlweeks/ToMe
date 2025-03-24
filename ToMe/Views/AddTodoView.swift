@@ -10,12 +10,20 @@ import SwiftData
 
 struct AddTodoView: View {
     @Bindable var viewModel: TodoListViewModel
+    @FocusState private var isTitleFocused: Bool
+    @FocusState private var isDescriptionFocused: Bool
     
     var body: some View {
         NavigationStack {
             Form {
                 TextField("Todo Title", text: viewModel.newTodoTitleBinding)
+                    .focused($isTitleFocused)
+                    
+                    .onSubmit {
+                        isDescriptionFocused = true
+                    }
                 TextField("Todo Description", text: viewModel.newTodoDescriptionBinding)
+                    .focused($isDescriptionFocused)
             }
             .navigationTitle("Add Todo")
             .navigationBarTitleDisplayMode(.inline)
@@ -32,7 +40,9 @@ struct AddTodoView: View {
                 }
             }
         }
-        
+        .onAppear {
+            isTitleFocused = true
+        }
     }
 }
 

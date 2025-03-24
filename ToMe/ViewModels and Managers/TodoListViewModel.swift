@@ -70,7 +70,6 @@ class TodoListViewModel {
     func moveTodo(from source: IndexSet, to destination: Int) {
         todos.move(fromOffsets: source, toOffset: destination)
         updateIndices()
-        
     }
     
     // MARK: Searching
@@ -114,7 +113,7 @@ class TodoListViewModel {
     
     func deleteTodo(_ todo: TodoItem) {
         Task { @MainActor in
-            if let index = todos.firstIndex(of: todo) {
+            if todos.firstIndex(of: todo) != nil {
                 dataSource.delete(todo)
             }
             todos = dataSource.fetchTodos()
@@ -125,14 +124,11 @@ class TodoListViewModel {
     // MARK: Testing functions
     func preloadSampleData() {
         let sampleTodos = TodoItem.samplesWithOrderIndices()
-        
-        // Add to your data source
         Task { @MainActor in
             for todo in sampleTodos {
                 dataSource.insert(todo)
             }
         }
-        
         fetchTodos()
     }
 }
