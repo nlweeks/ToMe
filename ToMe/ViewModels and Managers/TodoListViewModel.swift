@@ -131,5 +131,51 @@ class TodoListViewModel {
         }
         fetchTodos()
     }
+
+    // MARK: - Selection Management
+    var selectedIds = Set<UUID>()
+    var isSelectAllActive = false
+
+    // Check if all items are selected
+    var areAllItemsSelected: Bool {
+        selectedIds.count == todos.count && !todos.isEmpty
+    }
+
+    // Clear all selections
+    func clearAllSelections() {
+        selectedIds.removeAll()
+        isSelectAllActive = false
+    }
+
+    // Select all items
+    func selectAllItems() {
+        selectedIds = Set(todos.map { $0.id })
+        isSelectAllActive = true
+    }
+
+    // Toggle selection state
+    func toggleSelectAll() {
+        if areAllItemsSelected {
+            clearAllSelections()
+        } else {
+            selectAllItems()
+        }
+    }
+
+    // Toggle single item selection
+    func toggleItemSelection(id: UUID) {
+        if selectedIds.contains(id) {
+            selectedIds.remove(id)
+        } else {
+            selectedIds.insert(id)
+        }
+        // Update the isSelectAllActive state based on the current selection
+        isSelectAllActive = areAllItemsSelected
+    }
+
+    // Check if an item is selected
+    func isItemSelected(_ id: UUID) -> Bool {
+        return selectedIds.contains(id)
+    }
 }
 
