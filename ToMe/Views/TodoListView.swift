@@ -15,62 +15,66 @@ struct TodoListView: View {
             context: SwiftDataContextManager.shared.context)
     )
     
-    @State private var editMode: EditMode = .inactive
-    @State var selectedRows = Set<TodoItem>()
+    @Environment(\.editMode) var editMode
+    @State var selectedRows = Set<UUID>()
+    @State var isInEditMode = false
     
     var body: some View {
-        
-        NavigationStack {
-                List(selection: $selectedRows) {
-                    ForEach(viewModel.searchResults) { todo in
-                        Text(todo.title)
-                    }
-                    .onDelete(perform: viewModel.deleteTodos(at:))
-                    .onMove(perform: viewModel.moveTodo(from:to:))
-                }
-                .navigationBarTitle("To-Do List")
-                .environment(\.editMode, $editMode)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(editMode.isEditing ? "Done" : "Edit") {
-                            withAnimation {
-                                editMode = editMode == .active ? .inactive : .active
-                            }
-                        }
-                            .opacity(viewModel.todos.isEmpty ? 0 : 1)
-                        
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        TodoListMenu(viewModel: viewModel)
-                    }
-                    
-                    ToolbarItem(placement: .bottomBar) {
-                        HStack {
-                            Spacer()
-                            Button {
-                                viewModel.prepareNewTodo()
+        NavigationView {
+            List(selection: $selectedRows) {
+                ForEach(viewModel.searchResults, id: \.id) { todo in
+                    Text(todo.title)
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                viewModel.deleteTodo(todo)
                             } label: {
-                                Image(systemName: "plus")
+                                Label("Delete", systemImage: "trash")
                             }
                         }
+                }
+                .onMove(perform: viewModel.moveTodo(from:to:))
+            }
+            .navigationBarTitle("To-Do List")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                        .opacity(viewModel.todos.isEmpty ? 0 : 1)
+//                        .simultaneousGesture(TapGesture.onEnded) {
+//                            isInEditMode.toggle()
+//                        }
+                    
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    TodoListMenu(viewModel: viewModel)
+                }
+                
+                ToolbarItem(placement: .bottomBar) {
+                    HStack {
+                        Spacer()
+                        Button {
+                            viewModel.prepareNewTodo()
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+//                        .disabled(editMode?.wrappedValue == .active)
+//                        .opacity(editMode?.wrappedValue == .active ? 0.3 : 1)
                     }
                 }
-                .overlay {
-                    if viewModel.todos.isEmpty {
-                        EmptyListView()
-                    }
+            }
+            .overlay {
+                if viewModel.todos.isEmpty {
+                    EmptyListView()
                 }
-                .sheet(isPresented: $viewModel.isAddingTodo) {
-                    AddTodoView(viewModel: viewModel)
-                        .interactiveDismissDisabled()
-                        .presentationDetents([.medium])
-                }
-                .onAppear {
-                    viewModel.preloadSampleData()
-                }
-                .searchable(text: $viewModel.searchQuery, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search")
+            }
+            .sheet(isPresented: $viewModel.isAddingTodo) {
+                AddTodoView(viewModel: viewModel)
+                    .interactiveDismissDisabled()
+                    .presentationDetents([.medium])
+            }
+            .onAppear {
+                viewModel.preloadSampleData()
+            }
         }
-        
     }
     
     private struct EmptyListView: View {

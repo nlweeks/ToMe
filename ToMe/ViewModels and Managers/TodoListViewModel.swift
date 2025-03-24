@@ -112,6 +112,16 @@ class TodoListViewModel {
         updateIndices()
     }
     
+    func deleteTodo(_ todo: TodoItem) {
+        Task { @MainActor in
+            if let index = todos.firstIndex(of: todo) {
+                dataSource.delete(todo)
+            }
+            todos = dataSource.fetchTodos()
+        }
+        updateIndices()
+    }
+    
     // MARK: Testing functions
     func preloadSampleData() {
         let sampleTodos = TodoItem.samplesWithOrderIndices()

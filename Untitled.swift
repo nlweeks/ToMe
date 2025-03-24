@@ -4,39 +4,50 @@
 //
 //  Created by Noah Weeks on 3/22/25.
 //
-
+//  ContentView.swift
 import SwiftUI
 
-struct Book: Identifiable, Hashable {
-    let name: String
+struct CustomListData: Identifiable {
     let id = UUID()
+    let title: String
 }
-private var books = [
-    Book(name: "SwiftUI"),
-    Book(name: "Swift"),
-    Book(name: "Objective-C"),
-    Book(name: "C#"),
-    Book(name: "Java"),
-    Book(name: "SwiftUI"),
-    Book(name: "Swift"),
-    Book(name: "Objective-C"),
-    Book(name: "C#"),
-    Book(name: "Java")
-]
-struct TestView: View {
-    @State private var multiSelection = Set<UUID>()
+
+struct CustomListView: View {
+    @State var customListData = [
+        CustomListData(title: "One"),
+        CustomListData(title: "Two"),
+        CustomListData(title: "Three"),
+        CustomListData(title: "Four"),
+        CustomListData(title: "Five")
+    ]
+    
     var body: some View {
-        NavigationView {
-            List(books, selection: $multiSelection) {
-                Text($0.name)
+        VStack {
+            List {
+                ForEach(customListData) { item in
+                    Text(item.title)
+                }
+                .onDelete(perform: deleteItems)
             }
-            .navigationTitle("Books")
-            .toolbar { EditButton() }
+            
+            HStack {
+                Spacer()
+                EditButton()
+                
+                Button {
+                    customListData.append(CustomListData(title: "New Item"))
+                } label: {
+                    Text("Add")
+                }
+            }.padding()
         }
-        Text("\(multiSelection.count) selected")
+    }
+    
+    func deleteItems(at offsets: IndexSet) {
+        customListData.remove(atOffsets: offsets)
     }
 }
 
 #Preview {
-    TestView()
+    CustomListView()
 }
