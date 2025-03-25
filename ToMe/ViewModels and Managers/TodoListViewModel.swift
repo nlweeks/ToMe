@@ -67,6 +67,14 @@ class TodoListViewModel {
         }
     }
     
+    var areCompletedTodosAtBottom: Bool = true
+    
+    private func moveCompletedTodosToEnd() {
+        todos.sort { (todo1, todo2) -> Bool in
+            todo1.isCompleted != todo2.isCompleted
+        }
+    }
+    
     func moveTodo(from source: IndexSet, to destination: Int) {
         todos.move(fromOffsets: source, toOffset: destination)
         updateIndices()
@@ -88,6 +96,9 @@ class TodoListViewModel {
     func fetchTodos(sortedBy method: SortMethod = .storedOrder) {
         Task { @MainActor in
             todos = dataSource.fetchTodos(sortedBy: method)
+        }
+        if areCompletedTodosAtBottom {
+            moveCompletedTodosToEnd()
         }
         updateIndices()
     }
@@ -231,6 +242,14 @@ class TodoListViewModel {
             try? await Task.sleep(nanoseconds: 300_000_000)
             todos = dataSource.fetchTodos()
             updateIndices()
+        }
+    }
+    
+    // MARK: Complete todos
+    // Complete targeted todo
+    func markTodoAsCompleted(_ todo: TodoItem) {
+        withAnimation {
+            todo.isCompleted.toggle()
         }
     }
 }
