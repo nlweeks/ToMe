@@ -100,25 +100,25 @@ class TodoListViewModel {
         updateIndices()
     }
     
-    func deleteTodos(at offsets: IndexSet) {
-        Task { @MainActor in
-            offsets.forEach { index in
-                let todo = todos[index]
-                dataSource.delete(todo)
-            }
-            todos = dataSource.fetchTodos()
-        }
-        updateIndices()
-    }
-    
     func deleteTodo(_ todo: TodoItem) {
-        Task { @MainActor in
-            if todos.firstIndex(of: todo) != nil {
-                dataSource.delete(todo)
+        // First, check if todo exists in our array
+        if todos.firstIndex(of: todo) != nil {
+            // Use withAnimation for the UI update
+            withAnimation(.easeInOut(duration: 0.3)) {
+                // Remove from local array
+                todos.removeAll { $0.id == todo.id }
             }
-            todos = dataSource.fetchTodos()
+            
+            // Delete from data source without capturing self in Task
+            Task { @MainActor in
+                dataSource.delete(todo)
+                
+                // Refresh todos after a short delay to let animation complete
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                todos = dataSource.fetchTodos()
+                updateIndices()
+            }
         }
-        updateIndices()
     }
     
     // MARK: Testing functions
@@ -131,28 +131,28 @@ class TodoListViewModel {
         }
         fetchTodos()
     }
-
+    
     // MARK: - Selection Management
     var selectedIds = Set<UUID>()
     var isSelectAllActive = false
-
+    
     // Check if all items are selected
     var areAllItemsSelected: Bool {
         selectedIds.count == todos.count && !todos.isEmpty
     }
-
+    
     // Clear all selections
     func clearAllSelections() {
         selectedIds.removeAll()
         isSelectAllActive = false
     }
-
+    
     // Select all items
     func selectAllItems() {
         selectedIds = Set(todos.map { $0.id })
         isSelectAllActive = true
     }
-
+    
     // Toggle selection state
     func toggleSelectAll() {
         if areAllItemsSelected {
@@ -161,7 +161,7 @@ class TodoListViewModel {
             selectAllItems()
         }
     }
-
+    
     // Toggle single item selection
     func toggleItemSelection(id: UUID) {
         if selectedIds.contains(id) {
@@ -172,10 +172,66 @@ class TodoListViewModel {
         // Update the isSelectAllActive state based on the current selection
         isSelectAllActive = areAllItemsSelected
     }
-
+    
     // Check if an item is selected
     func isItemSelected(_ id: UUID) -> Bool {
         return selectedIds.contains(id)
+    }
+    
+    func deleteSelectedTodos() {
+        // Get the todos to delete
+        let todosToRemove = todos.filter { selectedIds.contains($0.id) }
+        
+        // Skip if nothing to delete
+        if todosToRemove.isEmpty { return }
+        
+        // Use withAnimation for the UI update
+        withAnimation(.easeInOut(duration: 0.3)) {
+            // Remove from the local array for immediate UI update
+            todos.removeAll { todo in
+                selectedIds.contains(todo.id)
+            }
+        }
+        
+        // Delete from data source without capturing self in complex closure
+        Task { @MainActor in
+            // Delete each todo from the data source
+            for todo in todosToRemove {
+                dataSource.delete(todo)
+            }
+            
+            // Refresh todos after a short delay to let animation complete
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            todos = dataSource.fetchTodos()
+            updateIndices()
+            
+            // Clear selection
+            clearAllSelections()
+        }
+    }
+    
+    func deleteTodos(at indexSet: IndexSet) {
+        // Get the todos to delete
+        let todosToRemove = indexSet.map { todos[$0] }
+        
+        // Use withAnimation for the UI update
+        withAnimation(.easeInOut(duration: 0.3)) {
+            // Remove from the local array
+            todos.remove(atOffsets: indexSet)
+        }
+        
+        // Delete from data source
+        Task { @MainActor in
+            // Delete each todo from the data source
+            for todo in todosToRemove {
+                dataSource.delete(todo)
+            }
+            
+            // Refresh todos after a short delay to let animation complete
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            todos = dataSource.fetchTodos()
+            updateIndices()
+        }
     }
 }
 
