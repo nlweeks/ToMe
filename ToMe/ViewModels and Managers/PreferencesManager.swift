@@ -15,9 +15,11 @@ class PreferencesManager {
     static let shared = PreferencesManager()
     
     // Properties with @AppStorage
-    @AppStorage("sortByCompletionStatus") var sortByCompletionStatus: Bool = false
+    @AppStorage("sortByCompletionStatus") var sortByCompletionStatus: Bool = true
     @AppStorage("showCompletedTodos") var showCompletedTodos: Bool = true
     @AppStorage("sortMethod") var sortMethod: SortMethod = .title
+    
+    private init() {}
     
     // Optional: Publisher for reactive updates (if using Combine)
     var preferencesDidChange = PassthroughSubject<Void, Never>()

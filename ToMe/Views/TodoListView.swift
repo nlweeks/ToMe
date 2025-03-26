@@ -17,44 +17,20 @@ struct TodoListView: View {
             context: SwiftDataContextManager.shared.context)
     )
     
-    @Environment(\.shouldSortByCompletion) var shouldSortByCompletion
     @State var editMode = EditMode.inactive
     
     var body: some View {
         NavigationStack {
             List(selection: $viewModel.selectedIds) {
                 ForEach(viewModel.searchResults, id: \.id) { todo in
-                    HStack {
-                        Button {
-                            viewModel.markTodoAsCompleted(todo)
-                        } label: {
-                            if todo.isCompleted {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.blue)
-                            } else {
-                                Image(systemName: "circle")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        .buttonStyle(PlainButtonStyle()) // This prevents the button styling
-                        
-                        Text(todo.title)
-                            .foregroundColor(todo.isCompleted ? .gray : .primary)
-                    }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            viewModel.deleteTodo(todo)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                    .selectionDisabled(!editMode.isEditing)
+                    TodoRowView(viewModel: viewModel, todo: todo, isEditMode: editMode.isEditing)
                 }
                 .onMove(perform: viewModel.moveTodo(from:to:))
             }
             .listStyle(.inset)
             .environment(\.editMode, $editMode)
-            .navigationBarTitle("To-Do List")
+            .navigationTitle("To-Do List")
+            .animation(.spring(duration: 0.5), value: viewModel.todos)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { editButton }
                 ToolbarItem(placement: .topBarTrailing) { TodoListMenu(viewModel: viewModel) }
@@ -145,6 +121,41 @@ struct TodoListView: View {
     }
 }
 
+
+struct TodoRowView: View {
+    @Bindable var viewModel: TodoListViewModel
+    let todo: TodoItem
+    let isEditMode: Bool
+    
+    var body: some View {
+        HStack {
+            Button {
+                viewModel.markTodoAsCompleted(todo)
+            } label: {
+                if todo.isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.blue)
+                } else {
+                    Image(systemName: "circle")
+                        .foregroundColor(.gray)
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            Text(todo.title)
+                .foregroundColor(todo.isCompleted ? .gray : .primary)
+        }
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) {
+                viewModel.deleteTodo(todo)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .selectionDisabled(!isEditMode)
+    }
+}
+
 struct EmptyListView: View {
     @State private var isAppearing: Bool = false
     
@@ -170,7 +181,7 @@ struct EmptyListView: View {
 
 struct TodoListMenu: View {
     @Bindable var viewModel: TodoListViewModel
-
+    
     var body: some View {
         Menu(content:{
             Menu(content: {
