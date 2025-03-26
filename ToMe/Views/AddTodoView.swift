@@ -43,14 +43,18 @@ struct AddTodoView: View {
         .onAppear {
             isTitleFocused = true
         }
+        .task {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            isTitleFocused = true
+        }
     }
 }
 
 
 #Preview {
-    var container = try? ModelContainer()
-    var context = container!.mainContext
-    var viewModel = TodoListViewModel(with: SwiftDataSource(container: container, context: context))
+    let container = try? ModelContainer()
+    let context = container!.mainContext
+    let viewModel = TodoListViewModel(with: SwiftDataSource(container: container, context: context))
     NavigationStack {
         AddTodoView(viewModel: viewModel)
     }

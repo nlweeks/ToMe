@@ -16,8 +16,13 @@ class TodoListViewModel {
     // MARK: Preferences Manager
     private let preferences = PreferencesManager.shared
     
-    // MARK: Working Todo List
-    var todos: [TodoItem] = []
+    // MARK: Master Todo List & Visible Todo List
+    private var allTodos: [TodoItem] = [] {
+        didSet {
+            sortTodos() // Update visible list when master list changes
+        }
+    }
+    var todos: [TodoItem] = []  // Visible, filtered list
     
     // MARK: Shared constants
     private let animationDuration: Double = 0.3
@@ -28,11 +33,11 @@ class TodoListViewModel {
         self.dataSource = dataSource
         
         Task { @MainActor in
-            todos = dataSource.fetchTodos()
+            allTodos = dataSource.fetchTodos()
         }
     }
     
-    // MARK: New Todo UI Bindings
+    // MARK: UI Bindings
     var newTodoTitleBinding: Binding<String> {
         Binding(
             get: { self.newTodo?.title ?? "" },
@@ -43,6 +48,21 @@ class TodoListViewModel {
         Binding(
             get: { self.newTodo?.todoDescription ?? "" },
             set: { self.newTodo?.todoDescription = $0 }
+        )
+    }
+    
+    func todoTitleBinding(for todo: TodoItem) -> Binding<String> {
+        Binding(
+            get: { todo.title },
+            set: { newValue in
+                // Find and update the todo in your data source
+                if let index = self.todos.firstIndex(where: { $0.id == todo.id }) {
+                    self.todos[index].title = newValue
+                    Task { @MainActor in
+                        self.dataSource.update()
+                    }
+                }
+            }
         )
     }
     
@@ -67,20 +87,20 @@ class TodoListViewModel {
     }
     
     // MARK: Sorting
-    var sortByCompletionStatus: Bool {
-        get { preferences.sortByCompletionStatus }
-        set {
-            preferences.sortByCompletionStatus = newValue
+    var showCompletedTodos: Bool = PreferencesManager.shared.showCompletedTodos {
+        didSet {
+            PreferencesManager.shared.showCompletedTodos = showCompletedTodos
             sortTodos()
         }
     }
-    var showCompletedTodos: Bool {
-        get { preferences.showCompletedTodos }
-        set {
-            preferences.showCompletedTodos = newValue
-            sortTodos()
+    
+    func showHideCompletedTodos() {
+        let newValue = !showCompletedTodos
+        DispatchQueue.main.async {
+            self.showCompletedTodos = newValue
         }
     }
+    
     var sortMethod: SortMethod {
         get { preferences.sortMethod }
         set {
@@ -93,43 +113,22 @@ class TodoListViewModel {
         for (index, todo) in todos.enumerated() {
             todo.orderIndex = index
         }
-        updateDatabase()
-    }
-    
-    private func updateDatabase() {
-        Task { @MainActor in
-            dataSource.update()
-        }
     }
     
     func sortTodos() {
-        let oldTodos = todos // Keep track of original state
-        let newTodos = todos
-        var completedTodos: [TodoItem] = []
-        var uncompletedTodos: [TodoItem] = []
+        // Separate the master list
+        let completedTodos = allTodos.filter { $0.isCompleted }
+            .sorted(by: sortMethod.sortClosure)
+        let uncompletedTodos = allTodos.filter { !$0.isCompleted }
+            .sorted(by: sortMethod.sortClosure)
         
-        for todo in newTodos {
-            if todo.isCompleted {
-                completedTodos.append(todo)
-            } else {
-                uncompletedTodos.append(todo)
-            }
-        }
+        // Filter based on the showCompletedTodos flag
+        let sortedTodos = uncompletedTodos + (showCompletedTodos ? completedTodos : [])
         
-        completedTodos.sort(by: sortMethod.sortClosure)
-        uncompletedTodos.sort(by: sortMethod.sortClosure)
-        
-        // Prepare the new order before applying it
-        let sortedTodos = sortByCompletionStatus
-            ? uncompletedTodos + (showCompletedTodos ? completedTodos : [])
-            : newTodos.sorted(by: sortMethod.sortClosure)
-        
-        // Apply the changes with animation
         withAnimation(.spring(duration: 0.5, bounce: 0.2)) {
             todos = sortedTodos
         }
         
-        // Update indices after animation has been triggered
         updateIndices()
     }
     
@@ -161,17 +160,14 @@ class TodoListViewModel {
     // MARK: Data source interfacing
     func fetchTodos() {
         Task { @MainActor in
-            todos = dataSource.fetchTodos(sortedBy: sortMethod)
-            sortTodos()
+            allTodos = dataSource.fetchTodos(sortedBy: sortMethod)
         }
     }
     
     func insertTodo(_ todo: TodoItem) {
         Task { @MainActor in
-            do {
-                dataSource.insert(todo)
-                fetchTodos()
-            }
+            dataSource.insert(todo)
+            fetchTodos() // Refresh master list
         }
     }
     
@@ -218,7 +214,7 @@ class TodoListViewModel {
     private func deleteTodosImplementation(todosToRemove: [TodoItem], clearSelections: Bool = false) {
         if todosToRemove.isEmpty { return }
         
-        withAnimation(.easeInOut(duration: animationDuration)) {
+        withAnimation(.easeInOut(duration: 0.3)) {
             todos.removeAll { todo in
                 todosToRemove.contains(where: { $0.id == todo.id })
             }

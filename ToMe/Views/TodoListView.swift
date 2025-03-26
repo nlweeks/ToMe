@@ -21,25 +21,32 @@ struct TodoListView: View {
     
     var body: some View {
         NavigationStack {
-            List(selection: $viewModel.selectedIds) {
-                ForEach(viewModel.searchResults, id: \.id) { todo in
-                    TodoRowView(viewModel: viewModel, todo: todo, isEditMode: editMode.isEditing)
+            ZStack {
+                if viewModel.todos.isEmpty {
+                    EmptyListView()
+                } else {
+                    List(selection: $viewModel.selectedIds) {
+                        if !viewModel.todos.isEmpty {
+                            ForEach(viewModel.todos, id: \.id) { todo in
+                                TodoRowView(viewModel: viewModel, todo: todo, isEditMode: editMode.isEditing)
+                            }
+                            .onMove(perform: viewModel.moveTodo(from:to:))
+                            .transition(.asymmetric(
+                                insertion: .opacity,
+                                removal: .move(edge: .leading).combined(with: .opacity)
+                            ))
+                        }
+                    }
+                    .listStyle(.inset)
+//                    .animation(.spring(duration: 0.5), value: viewModel.todos)
                 }
-                .onMove(perform: viewModel.moveTodo(from:to:))
             }
-            .listStyle(.inset)
             .environment(\.editMode, $editMode)
             .navigationTitle("To-Do List")
-            .animation(.spring(duration: 0.5), value: viewModel.todos)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { editButton }
                 ToolbarItem(placement: .topBarTrailing) { TodoListMenu(viewModel: viewModel) }
                 ToolbarItem(placement: .bottomBar) { bottomToolbar }
-            }
-            .overlay {
-                if viewModel.todos.isEmpty {
-                    EmptyListView()
-                }
             }
             .sheet(isPresented: $viewModel.isAddingTodo) {
                 AddTodoView(viewModel: viewModel)
@@ -73,15 +80,14 @@ struct TodoListView: View {
         HStack {
             if editMode.isEditing && !viewModel.todos.isEmpty {
                 selectAllButton
-            }
-            Spacer()
-            if editMode.isEditing {
+                Spacer()
                 Button(role: .destructive) {
                     viewModel.deleteSelectedTodos()
                 } label: {
                     Text("Delete")
                 }
             } else {
+                Spacer()
                 addTodoButton
             }
         }
@@ -142,7 +148,7 @@ struct TodoRowView: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            Text(todo.title)
+            TextField(todo.title, text: viewModel.todoTitleBinding(for: todo))
                 .foregroundColor(todo.isCompleted ? .gray : .primary)
         }
         .swipeActions(edge: .trailing) {
@@ -160,48 +166,30 @@ struct EmptyListView: View {
     @State private var isAppearing: Bool = false
     
     var body: some View {
-        ContentUnavailableView {
-            Label(title: { Text("You're all done!") }, icon: {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 50))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.blue)
-                    .opacity(isAppearing ? 1 : 0)
-                    .scaleEffect(isAppearing ? 1 : 0.5)
-                    .animation(.spring(duration: 0.7), value: isAppearing)
-                    .onAppear {
-                        isAppearing = true
-                    }
-            })
-        } description: {
-            Text("Take a breather, then add what's next")
+        VStack {
+            Spacer()
+            ContentUnavailableView {
+                Label(title: { Text("You're all done!") }, icon: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 50))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.blue)
+                        .opacity(isAppearing ? 1 : 0)
+                        .scaleEffect(isAppearing ? 1 : 0.5)
+                        .animation(.spring(duration: 0.7), value: isAppearing)
+                        .onAppear {
+                            isAppearing = true
+                        }
+                })
+            } description: {
+                Text("Take a breather, then add what's next")
+            }
+            Spacer()
         }
     }
 }
 
-struct TodoListMenu: View {
-    @Bindable var viewModel: TodoListViewModel
-    
-    var body: some View {
-        Menu(content:{
-            Menu(content: {
-                Button("Title") {
-                    viewModel.sortMethod = .title
-                    viewModel.sortTodos()
-                }
-                Button("Created") {
-                    viewModel.sortMethod = .created
-                    viewModel.sortTodos()
-                }
-            }, label: {
-                Label("Sort", systemImage: "arrow.up.arrow.down")
-            })
-        }, label: {
-            Label("Options", systemImage: "ellipsis.circle")
-        })
-        .menuStyle(.button)
-    }
-}
+
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
