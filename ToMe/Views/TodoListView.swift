@@ -51,7 +51,7 @@ struct TodoListView: View {
             .sheet(isPresented: $viewModel.isAddingTodo) {
                 AddTodoView(viewModel: viewModel)
                     .interactiveDismissDisabled()
-                    .presentationDetents([.medium])
+                    .presentationDetents([.fraction(0.3)])
             }
             .onAppear {
                 viewModel.preloadSampleData()
