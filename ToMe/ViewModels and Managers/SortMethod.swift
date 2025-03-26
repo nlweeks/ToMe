@@ -25,4 +25,17 @@ enum SortMethod: String, CaseIterable {
             return SortDescriptor(\TodoItem.isCompleted, order: .forward)
         }
     }
+    
+    var sortClosure: (TodoItem, TodoItem) -> Bool {
+        switch self {
+        case .storedOrder:
+            return { $0.orderIndex ?? 0 < $1.orderIndex ?? 0 }
+        case .title:
+            return { $0.title < $1.title }
+        case .created:
+            return { $0.creationDate > $1.creationDate } // Newest first
+        case .completion:
+            return { $0.isCompleted && !$1.isCompleted }
+        }
+    }
 }

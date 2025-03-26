@@ -17,6 +17,7 @@ struct TodoListView: View {
             context: SwiftDataContextManager.shared.context)
     )
     
+    @Environment(\.shouldSortByCompletion) var shouldSortByCompletion
     @State var editMode = EditMode.inactive
     
     var body: some View {
@@ -174,10 +175,12 @@ struct TodoListMenu: View {
         Menu(content:{
             Menu(content: {
                 Button("Title") {
-                    viewModel.fetchTodos(sortedBy: .title)
+                    viewModel.sortMethod = .title
+                    viewModel.sortTodos()
                 }
                 Button("Created") {
-                    viewModel.fetchTodos(sortedBy: .created)
+                    viewModel.sortMethod = .created
+                    viewModel.sortTodos()
                 }
             }, label: {
                 Label("Sort", systemImage: "arrow.up.arrow.down")

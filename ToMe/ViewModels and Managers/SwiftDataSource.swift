@@ -36,4 +36,8 @@ extension SwiftDataSource {
         let todos = try? self.container?.mainContext.fetch(fetchDescriptor)
         return todos ?? []
     }
+    
+    func update(_ entity: TodoItem) {
+        try? self.container?.mainContext.save()
+    }
 }

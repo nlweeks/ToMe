@@ -13,8 +13,15 @@ class TodoListViewModel {
     // MARK: Data Source
     private let dataSource: SwiftDataSource
     
-    // MARK: Todos Loaded To Memory
+    // MARK: Preferences Manager
+    private let preferences = PreferencesManager.shared
+    
+    // MARK: Working Todo List
     var todos: [TodoItem] = []
+    
+    // MARK: Shared constants
+    private let animationDuration: Double = 0.3
+    private let animationDelayNanos: UInt64 = 300_000_000
     
     // MARK: Init
     init(with dataSource: SwiftDataSource) {
@@ -23,6 +30,20 @@ class TodoListViewModel {
         Task { @MainActor in
             todos = dataSource.fetchTodos()
         }
+    }
+    
+    // MARK: New Todo UI Bindings
+    var newTodoTitleBinding: Binding<String> {
+        Binding(
+            get: { self.newTodo?.title ?? "" },
+            set: { self.newTodo?.title = $0 }
+        )
+    }
+    var newTodoDescriptionBinding: Binding<String> {
+        Binding(
+            get: { self.newTodo?.todoDescription ?? "" },
+            set: { self.newTodo?.todoDescription = $0 }
+        )
     }
     
     // MARK: Adding New Todo
@@ -45,38 +66,63 @@ class TodoListViewModel {
         isAddingTodo = false
     }
     
-    // MARK: New Todo UI Bindings
-    var newTodoTitleBinding: Binding<String> {
-        Binding(
-            get: { self.newTodo?.title ?? "" },
-            set: { self.newTodo?.title = $0 }
-        )
-    }
-    
-    var newTodoDescriptionBinding: Binding<String> {
-        Binding(
-            get: { self.newTodo?.todoDescription ?? "" },
-            set: { self.newTodo?.todoDescription = $0 }
-        )
-    }
-    
     // MARK: Sorting
+    var sortByCompletionStatus: Bool {
+        get { preferences.sortByCompletionStatus }
+        set {
+            preferences.sortByCompletionStatus = newValue
+            sortTodos()
+        }
+    }
+    var showCompletedTodos: Bool {
+        get { preferences.showCompletedTodos }
+        set {
+            preferences.showCompletedTodos = newValue
+            sortTodos()
+        }
+    }
+    var sortMethod: SortMethod {
+        get { preferences.sortMethod }
+        set {
+            preferences.sortMethod = newValue
+            sortTodos()
+        }
+    }
+    
     private func updateIndices() {
         for (index, todo) in todos.enumerated() {
             todo.orderIndex = index
         }
     }
     
-    var areCompletedTodosAtBottom: Bool = true
-    
-    private func moveCompletedTodosToEnd() {
-        todos.sort { (todo1, todo2) -> Bool in
-            todo1.isCompleted != todo2.isCompleted
+    func sortTodos() {
+        var newTodos = todos
+        var completedTodos: [TodoItem] = []
+        var uncompletedTodos: [TodoItem] = []
+        
+        for todo in newTodos {
+            if todo.isCompleted {
+                completedTodos.append(todo)
+            } else {
+                uncompletedTodos.append(todo)
+            }
         }
+        
+        completedTodos.sort(by: sortMethod.sortClosure)
+        uncompletedTodos.sort(by: sortMethod.sortClosure)
+        
+        if sortByCompletionStatus {
+            todos = uncompletedTodos + (showCompletedTodos ? completedTodos : [])
+        } else {
+            todos = newTodos.sorted(by: sortMethod.sortClosure)
+        }
+        
+        updateIndices()
     }
     
     func moveTodo(from source: IndexSet, to destination: Int) {
         todos.move(fromOffsets: source, toOffset: destination)
+        sortMethod = .storedOrder
         updateIndices()
     }
     
@@ -93,78 +139,39 @@ class TodoListViewModel {
     }
     
     // MARK: Data source interfacing
-    func fetchTodos(sortedBy method: SortMethod = .storedOrder) {
+    func fetchTodos() {
         Task { @MainActor in
-            todos = dataSource.fetchTodos(sortedBy: method)
+            todos = dataSource.fetchTodos(sortedBy: sortMethod)
+            sortTodos()
         }
-        if areCompletedTodosAtBottom {
-            moveCompletedTodosToEnd()
-        }
-        updateIndices()
     }
     
     func insertTodo(_ todo: TodoItem) {
         Task { @MainActor in
-            dataSource.insert(todo)
-            todos = dataSource.fetchTodos()
-        }
-        updateIndices()
-    }
-    
-    func deleteTodo(_ todo: TodoItem) {
-        // First, check if todo exists in our array
-        if todos.firstIndex(of: todo) != nil {
-            // Use withAnimation for the UI update
-            withAnimation(.easeInOut(duration: 0.3)) {
-                // Remove from local array
-                todos.removeAll { $0.id == todo.id }
-            }
-            
-            // Delete from data source without capturing self in Task
-            Task { @MainActor in
-                dataSource.delete(todo)
-                
-                // Refresh todos after a short delay to let animation complete
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                todos = dataSource.fetchTodos()
-                updateIndices()
-            }
-        }
-    }
-    
-    // MARK: Testing functions
-    func preloadSampleData() {
-        let sampleTodos = TodoItem.samplesWithOrderIndices()
-        Task { @MainActor in
-            for todo in sampleTodos {
+            do {
                 dataSource.insert(todo)
+                fetchTodos()
             }
         }
-        fetchTodos()
     }
     
     // MARK: - Selection Management
     var selectedIds = Set<UUID>()
     var isSelectAllActive = false
-    
-    // Check if all items are selected
     var areAllItemsSelected: Bool {
         selectedIds.count == todos.count && !todos.isEmpty
     }
     
-    // Clear all selections
     func clearAllSelections() {
         selectedIds.removeAll()
         isSelectAllActive = false
     }
     
-    // Select all items
     func selectAllItems() {
         selectedIds = Set(todos.map { $0.id })
         isSelectAllActive = true
     }
     
-    // Toggle selection state
     func toggleSelectAll() {
         if areAllItemsSelected {
             clearAllSelections()
@@ -173,83 +180,75 @@ class TodoListViewModel {
         }
     }
     
-    // Toggle single item selection
     func toggleItemSelection(id: UUID) {
         if selectedIds.contains(id) {
             selectedIds.remove(id)
         } else {
             selectedIds.insert(id)
         }
-        // Update the isSelectAllActive state based on the current selection
+        
         isSelectAllActive = areAllItemsSelected
     }
     
-    // Check if an item is selected
     func isItemSelected(_ id: UUID) -> Bool {
         return selectedIds.contains(id)
     }
     
-    func deleteSelectedTodos() {
-        // Get the todos to delete
-        let todosToRemove = todos.filter { selectedIds.contains($0.id) }
-        
-        // Skip if nothing to delete
+    // MARK: Deleting todos
+    private func deleteTodosImplementation(todosToRemove: [TodoItem], clearSelections: Bool = false) {
         if todosToRemove.isEmpty { return }
         
-        // Use withAnimation for the UI update
-        withAnimation(.easeInOut(duration: 0.3)) {
-            // Remove from the local array for immediate UI update
+        withAnimation(.easeInOut(duration: animationDuration)) {
             todos.removeAll { todo in
-                selectedIds.contains(todo.id)
+                todosToRemove.contains(where: { $0.id == todo.id })
             }
         }
         
-        // Delete from data source without capturing self in complex closure
         Task { @MainActor in
-            // Delete each todo from the data source
             for todo in todosToRemove {
                 dataSource.delete(todo)
             }
             
-            // Refresh todos after a short delay to let animation complete
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            todos = dataSource.fetchTodos()
-            updateIndices()
+            try? await Task.sleep(nanoseconds: animationDelayNanos)
+            fetchTodos()
             
-            // Clear selection
-            clearAllSelections()
+            if clearSelections {
+                clearAllSelections()
+            }
         }
+    }
+    
+    func deleteSelectedTodos() {
+        let todosToRemove = todos.filter { selectedIds.contains($0.id) }
+        deleteTodosImplementation(todosToRemove: todosToRemove, clearSelections: true)
     }
     
     func deleteTodos(at indexSet: IndexSet) {
-        // Get the todos to delete
         let todosToRemove = indexSet.map { todos[$0] }
-        
-        // Use withAnimation for the UI update
-        withAnimation(.easeInOut(duration: 0.3)) {
-            // Remove from the local array
-            todos.remove(atOffsets: indexSet)
-        }
-        
-        // Delete from data source
-        Task { @MainActor in
-            // Delete each todo from the data source
-            for todo in todosToRemove {
-                dataSource.delete(todo)
-            }
-            
-            // Refresh todos after a short delay to let animation complete
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            todos = dataSource.fetchTodos()
-            updateIndices()
-        }
+        deleteTodosImplementation(todosToRemove: todosToRemove)
     }
     
     // MARK: Complete todos
-    // Complete targeted todo
     func markTodoAsCompleted(_ todo: TodoItem) {
         withAnimation {
             todo.isCompleted.toggle()
+        }
+        
+        Task { @MainActor in
+            dataSource.update(todo)
+            sortTodos()
+        }
+    }
+    
+    // MARK: Testing functions
+    func preloadSampleData() {
+        let sampleTodos = TodoItem.samplesWithOrderIndices()
+        
+        Task { @MainActor in
+            for todo in sampleTodos {
+                dataSource.insert(todo)
+            }
+            fetchTodos()
         }
     }
 }
