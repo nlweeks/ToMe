@@ -88,11 +88,11 @@ class TodoListViewModel {
     
     // MARK: Sorting
     var showCompletedTodos: Bool = PreferencesManager.shared.showCompletedTodos {
-        didSet {
-            PreferencesManager.shared.showCompletedTodos = showCompletedTodos
-            sortTodos()
+            didSet {
+                PreferencesManager.shared.showCompletedTodos = showCompletedTodos
+                sortTodos()
+            }
         }
-    }
     
     func showHideCompletedTodos() {
         let newValue = !showCompletedTodos
@@ -116,21 +116,15 @@ class TodoListViewModel {
     }
     
     func sortTodos() {
-        // Separate the master list
-        let completedTodos = allTodos.filter { $0.isCompleted }
-            .sorted(by: sortMethod.sortClosure)
-        let uncompletedTodos = allTodos.filter { !$0.isCompleted }
-            .sorted(by: sortMethod.sortClosure)
-        
-        // Filter based on the showCompletedTodos flag
-        let sortedTodos = uncompletedTodos + (showCompletedTodos ? completedTodos : [])
-        
-        withAnimation(.spring(duration: 0.5, bounce: 0.2)) {
+            let completedTodos = allTodos.filter { $0.isCompleted }
+                .sorted(by: sortMethod.sortClosure)
+            let uncompletedTodos = allTodos.filter { !$0.isCompleted }
+                .sorted(by: sortMethod.sortClosure)
+            let sortedTodos = uncompletedTodos + (showCompletedTodos ? completedTodos : [])
+            // Removed withAnimation wrapper
             todos = sortedTodos
+            updateIndices()
         }
-        
-        updateIndices()
-    }
     
     func moveTodo(from source: IndexSet, to destination: Int) {
         Task { @MainActor in
@@ -212,27 +206,22 @@ class TodoListViewModel {
     
     // MARK: Deleting todos
     private func deleteTodosImplementation(todosToRemove: [TodoItem], clearSelections: Bool = false) {
-        if todosToRemove.isEmpty { return }
-        
-        withAnimation(.easeInOut(duration: 0.3)) {
+            if todosToRemove.isEmpty { return }
+            
             todos.removeAll { todo in
                 todosToRemove.contains(where: { $0.id == todo.id })
             }
-        }
-        
-        Task { @MainActor in
-            for todo in todosToRemove {
-                dataSource.delete(todo)
-            }
             
-            try? await Task.sleep(nanoseconds: animationDelayNanos)
-            fetchTodos()
-            
-            if clearSelections {
-                clearAllSelections()
+            Task { @MainActor in
+                for todo in todosToRemove {
+                    dataSource.delete(todo)
+                }
+                fetchTodos()
+                if clearSelections {
+                    clearAllSelections()
+                }
             }
         }
-    }
     
     func deleteTodo(_ todo: TodoItem) {
         deleteTodosImplementation(todosToRemove: [todo])
@@ -250,21 +239,13 @@ class TodoListViewModel {
     
     // MARK: Complete todos
     func markTodoAsCompleted(_ todo: TodoItem) {
-        // Apply animations to the toggle
-        withAnimation(.spring(duration: 0.3)) {
+            // Directly toggle and update; let the view animate the list changes.
             todo.isCompleted.toggle()
+            Task { @MainActor in
+                dataSource.update()
+            }
+            sortTodos()
         }
-        
-        // Let the system process the toggle before sorting
-        Task { @MainActor in
-            // Wait a tiny fraction of a second to let the toggle animation finish
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            
-            // When the item is completed, apply sorting with animation
-            dataSource.update()
-            sortTodos() // Now uses animation internally
-        }
-    }
     
     // MARK: Testing functions
     func preloadSampleData() {

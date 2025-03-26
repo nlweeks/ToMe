@@ -18,6 +18,7 @@ struct TodoListView: View {
     )
     
     @State var editMode = EditMode.inactive
+    @FocusState private var focusedField: String?
     
     var body: some View {
         NavigationStack {
@@ -28,17 +29,44 @@ struct TodoListView: View {
                     List(selection: $viewModel.selectedIds) {
                         if !viewModel.todos.isEmpty {
                             ForEach(viewModel.todos, id: \.id) { todo in
-                                TodoRowView(viewModel: viewModel, todo: todo, isEditMode: editMode.isEditing)
+                                HStack {
+                                    if !editMode.isEditing {
+                                        Button {
+                                            viewModel.markTodoAsCompleted(todo)
+                                        } label: {
+                                            if todo.isCompleted {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .foregroundColor(.blue)
+                                            } else {
+                                                Image(systemName: "circle")
+                                                    .foregroundColor(.gray)
+                                            }
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .animation(.easeInOut(duration: 0.1), value: editMode.isEditing)
+
+                                    }
+                                    
+                                    TodoRowView(viewModel: viewModel, todo: todo, isEditMode: editMode.isEditing, focusedField: $focusedField, fieldId: todo.id.uuidString)
+                                }
+                                .animation(nil, value: editMode)
                             }
+                            
                             .onMove(perform: viewModel.moveTodo(from:to:))
-                            .transition(.asymmetric(
-                                insertion: .opacity,
-                                removal: .move(edge: .leading).combined(with: .opacity)
-                            ))
                         }
+                        
                     }
                     .listStyle(.inset)
-//                    .animation(.spring(duration: 0.5), value: viewModel.todos)
+                    .animation(nil, value: viewModel.todos)
+                    
+                    Color.clear
+                        .frame(height: 100)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            focusedField = nil
+                        }
+                        .allowsHitTesting(true)
+                    
                 }
             }
             .environment(\.editMode, $editMode)
@@ -47,6 +75,12 @@ struct TodoListView: View {
                 ToolbarItem(placement: .topBarLeading) { editButton }
                 ToolbarItem(placement: .topBarTrailing) { TodoListMenu(viewModel: viewModel) }
                 ToolbarItem(placement: .bottomBar) { bottomToolbar }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        focusedField = nil
+                    }
+                }
             }
             .sheet(isPresented: $viewModel.isAddingTodo) {
                 AddTodoView(viewModel: viewModel)
@@ -56,24 +90,38 @@ struct TodoListView: View {
             .onAppear {
                 viewModel.preloadSampleData()
             }
-            .onChange(of: viewModel.selectedIds) { oldValue, newValue in
+            .onChange(of: viewModel.selectedIds) { _, newValue in
                 if !newValue.isEmpty && !editMode.isEditing {
-                    withTransaction(Transaction(animation: .spring(duration: 0.5))) {
+                    // 👇 disable animation for the layout shift
+                    withTransaction(Transaction(animation: nil)) {
                         editMode = .active
                     }
                 }
             }
-            .onChange(of: editMode) { oldValue, newValue in
-                if !newValue.isEditing {
-                    viewModel.selectedIds.removeAll()
+            .onChange(of: editMode) { _, newValue in
+                // 👇 disable animation for the layout shift
+                withTransaction(Transaction(animation: nil)) {
+                    if !newValue.isEditing {
+                        viewModel.selectedIds.removeAll()
+                        focusedField = nil
+                    }
                 }
             }
-            .onChange(of: viewModel.todos.isEmpty) { wasEmpty, isEmpty in
+            .onChange(of: viewModel.todos.isEmpty) { _, isEmpty in
                 if isEmpty {
-                    editMode = .inactive
+                    withTransaction(Transaction(animation: nil)) {
+                        editMode = .inactive
+                    }
                 }
             }
         }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 10)
+                .onEnded { _ in
+                    focusedField = nil
+                }
+        )
     }
     
     private var bottomToolbar: some View {
@@ -105,8 +153,11 @@ struct TodoListView: View {
     
     private var editButton: some View {
         Button(editMode.isEditing ? "Done" : "Edit") {
-            withTransaction(Transaction(animation: .spring(duration: 0.5))) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                 editMode = editMode.isEditing ? .inactive : .active
+                if !editMode.isEditing {
+                    focusedField = nil
+                }
             }
         }
         .opacity(viewModel.todos.isEmpty ? 0 : 1)
@@ -128,39 +179,7 @@ struct TodoListView: View {
 }
 
 
-struct TodoRowView: View {
-    @Bindable var viewModel: TodoListViewModel
-    let todo: TodoItem
-    let isEditMode: Bool
-    
-    var body: some View {
-        HStack {
-            Button {
-                viewModel.markTodoAsCompleted(todo)
-            } label: {
-                if todo.isCompleted {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.blue)
-                } else {
-                    Image(systemName: "circle")
-                        .foregroundColor(.gray)
-                }
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            TextField(todo.title, text: viewModel.todoTitleBinding(for: todo))
-                .foregroundColor(todo.isCompleted ? .gray : .primary)
-        }
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive) {
-                viewModel.deleteTodo(todo)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-        .selectionDisabled(!isEditMode)
-    }
-}
+
 
 struct EmptyListView: View {
     @State private var isAppearing: Bool = false
