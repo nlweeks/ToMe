@@ -8,8 +8,6 @@
 import SwiftUI
 import SwiftData
 
-// TODO: Implement custom selection edit mode so the animation entering edit/select mode is smooth...a job for another day
-
 struct TodoListView: View {
     @State var viewModel = TodoListViewModel(
         with: SwiftDataSource(
@@ -19,6 +17,7 @@ struct TodoListView: View {
     
     @State var editMode = EditMode.inactive
     @FocusState private var focusedField: String?
+    @State private var shouldShowCompletionOpacity: Bool = true
     
     var body: some View {
         NavigationStack {
@@ -31,20 +30,7 @@ struct TodoListView: View {
                             ForEach(viewModel.todos, id: \.id) { todo in
                                 HStack {
                                     if !editMode.isEditing {
-                                        Button {
-                                            viewModel.markTodoAsCompleted(todo)
-                                        } label: {
-                                            if todo.isCompleted {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .foregroundColor(.blue)
-                                            } else {
-                                                Image(systemName: "circle")
-                                                    .foregroundColor(.gray)
-                                            }
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .animation(.easeInOut(duration: 0.1), value: editMode.isEditing)
-
+                                        CompletionButton(todo: todo, isInEditMode: editMode.isEditing, viewModel: viewModel, shouldShowCompletionOpacity: shouldShowCompletionOpacity)
                                     }
                                     
                                     TodoRowView(viewModel: viewModel, todo: todo, isEditMode: editMode.isEditing, focusedField: $focusedField, fieldId: todo.id.uuidString)
@@ -66,7 +52,6 @@ struct TodoListView: View {
                             focusedField = nil
                         }
                         .allowsHitTesting(true)
-                    
                 }
             }
             .environment(\.editMode, $editMode)
@@ -99,7 +84,17 @@ struct TodoListView: View {
                 }
             }
             .onChange(of: editMode) { _, newValue in
-                // 👇 disable animation for the layout shift
+                if newValue.isEditing {
+                    shouldShowCompletionOpacity = false
+                } else {
+                    // Delay the fade-in of the completion button
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            shouldShowCompletionOpacity = true
+                        }
+                    }
+                }
+                
                 withTransaction(Transaction(animation: nil)) {
                     if !newValue.isEditing {
                         viewModel.selectedIds.removeAll()
@@ -152,16 +147,25 @@ struct TodoListView: View {
     }
     
     private var editButton: some View {
-        Button(editMode.isEditing ? "Done" : "Edit") {
+        Button {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                 editMode = editMode.isEditing ? .inactive : .active
                 if !editMode.isEditing {
                     focusedField = nil
                 }
             }
+        } label: {
+            ZStack(alignment: .leading) {
+                Text("Edit")
+                    .opacity(editMode.isEditing ? 0 : 1)
+                Text("Done")
+                    .opacity(editMode.isEditing ? 1 : 0)
+            }
         }
+        .animation(.easeInOut(duration: 0.25), value: editMode.isEditing)
         .opacity(viewModel.todos.isEmpty ? 0 : 1)
     }
+    
     
     private var selectAllButton: some View {
         Button {
@@ -179,7 +183,32 @@ struct TodoListView: View {
 }
 
 
-
+struct CompletionButton: View {
+    var todo: TodoItem
+    var isInEditMode: Bool
+    @Bindable var viewModel: TodoListViewModel
+    let shouldShowCompletionOpacity: Bool
+    
+    var body: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.08)) {
+                viewModel.markTodoAsCompleted(todo)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    viewModel.sortTodos()
+                }
+            }
+        } label: {
+            Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(todo.isCompleted ? .blue : .gray)
+                .font(.title2.weight(.light))
+        }
+        .buttonStyle(PlainButtonStyle())
+        .opacity(isInEditMode ? 0 : (shouldShowCompletionOpacity ? 1 : 0))
+        .animation(.easeInOut(duration: 0.85), value: shouldShowCompletionOpacity)
+    }
+}
 
 struct EmptyListView: View {
     @State private var isAppearing: Bool = false
