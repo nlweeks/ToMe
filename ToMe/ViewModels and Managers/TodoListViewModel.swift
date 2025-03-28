@@ -33,7 +33,7 @@ class TodoListViewModel {
         self.dataSource = dataSource
         
         Task { @MainActor in
-            allTodos = dataSource.fetchTodos()
+            fetchTodos()
         }
     }
     
@@ -46,8 +46,8 @@ class TodoListViewModel {
     }
     var newTodoDescriptionBinding: Binding<String> {
         Binding(
-            get: { self.newTodo?.todoDescription ?? "" },
-            set: { self.newTodo?.todoDescription = $0 }
+            get: { self.newTodo?.notes ?? "" },
+            set: { self.newTodo?.notes = $0 }
         )
     }
     
@@ -71,7 +71,7 @@ class TodoListViewModel {
     var isAddingTodo: Bool = false
     
     func prepareNewTodo() {
-        newTodo = TodoItem(id: UUID(), title: "", todoDescription: "", creationDate: Date(), isCompleted: false)
+        newTodo = TodoItem(id: UUID(), title: "", notes: "", creationDate: Date(), isCompleted: false)
         isAddingTodo = true
     }
     

@@ -73,7 +73,9 @@ struct TodoListView: View {
                     .presentationDetents([.fraction(0.3)])
             }
             .onAppear {
-                viewModel.preloadSampleData()
+                if viewModel.todos.isEmpty {
+                    viewModel.preloadSampleData()
+                }
             }
             .onChange(of: viewModel.selectedIds) { _, newValue in
                 if !newValue.isEmpty && !editMode.isEditing {
